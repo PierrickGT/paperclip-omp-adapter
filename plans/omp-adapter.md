@@ -376,6 +376,9 @@ Every step follows RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR. No pr
 **REFACTOR**: If valuable.
 **Done when**: Both directions covered, commit approved.
 **✅ Shape resolved by Step 1(e)** — omp does fail rather than silently starting fresh, so the Step 9 retry path is needed as planned.
+**✅ DONE.** `isOmpUnknownSessionError` matches `/\bsessions?\b(?:[ \t]+"[^"]*")?[ \t]+not[ \t]+found\b/i` against stderr. All four of #2810's substrings are absent from the real text — a standing test proves it. Mutation testing replaced an earlier arbitrary `{0,80}` character gap with the explicit optional quoted id, killing three realistic false positives (`Session could not be written to disk`, `Session not writable`, `Session 01a03 found, resuming`).
+
+**Decision: the plural matches on purpose.** If omp reports that sessions in general are not found, our stored one cannot be there either, so retrying fresh is correct. The costs are asymmetric — a missed detection kills the run with exit 1, while a false positive only discards context the agent can rebuild. Word boundaries are kept so an unrelated `subsession not found` does not match.
 
 #### Step 4: Build the omp argument vector from adapter config
 

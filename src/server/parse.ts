@@ -111,6 +111,34 @@ const usageOf = (message: JsonRecord): JsonRecord | null => {
   return isRecord(usage) ? usage : null;
 };
 
+/**
+ * Matches omp's stale-session failure on a single line.
+ *
+ * The recorded text is `Error: Session "<uuid>" not found.` — the id sits between
+ * the two words, which is why PR #2810's `includes("session not found")` never
+ * fired. The quoted id is optional so a reworded release that drops it still
+ * matches, and only spaces and tabs may separate the parts, so an unrelated
+ * "not found" on the next line cannot pair with a mention of a session.
+ *
+ * The plural is accepted deliberately: if omp reports that sessions in general
+ * are not found, our stored one cannot be there either, so retrying fresh is the
+ * right move. The cost is asymmetric — failing to detect a stale session kills
+ * the run with a non-zero exit, while a false positive only discards context the
+ * agent can rebuild.
+ *
+ * The word boundaries still matter, so an unrelated `subsession not found` is not
+ * read as our session going missing.
+ */
+const UNKNOWN_SESSION = /\bsessions?\b(?:[ \t]+"[^"]*")?[ \t]+not[ \t]+found\b/i;
+
+/**
+ * True when omp refused to resume because it no longer knows the session.
+ *
+ * Reads stderr rather than the event stream: a stale resume exits 1 having
+ * written no stdout at all.
+ */
+export const isOmpUnknownSessionError = (stderr: string): boolean => UNKNOWN_SESSION.test(stderr);
+
 export const parseOmpRun = (stdout: string): OmpRunResult => {
   const events = parseLines(stdout);
   if (events.length === 0) return EMPTY_RESULT;
