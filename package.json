@@ -28,13 +28,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:live": "OMP_ADAPTER_LIVE=1 vitest run"
+    "test:live": "OMP_ADAPTER_LIVE=1 vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@paperclipai/adapter-utils": "^2026.817.0"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
+    "@vitest/coverage-v8": "^3.2.7",
     "typescript": "^5.7.3",
     "vitest": "^3.0.0"
   }
