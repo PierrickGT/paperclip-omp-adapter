@@ -389,6 +389,17 @@ Every step follows RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR. No pr
 **KILL MUTANTS**: Pin that an empty-string `model` emits no flag (empty vs undefined).
 **REFACTOR**: If valuable.
 **Done when**: Commit approved.
+**✅ DONE.** `buildOmpArgs` in `src/server/args.ts`. Mutation score 100% (21/21), no test changes needed after the first pass.
+
+**⚠ A third #2810 bug, found by probing before implementation.** `--append-system-prompt` accepts three forms and they do not behave alike on `omp/17.3.8`:
+
+| Form | Result |
+|---|---|
+| `@/path/to/file` | **Silently ignored** — the instruction is never applied, and nothing is reported |
+| `/path/to/file` | Works — omp reads the file |
+| direct text | Works |
+
+PR #2810 passed `` `@${instructionsFilePath}` ``, so agent instructions would have vanished with no error. The `@` prefix is documented for the positional `MESSAGES` argument, not for this flag. A test pins the bare path and asserts the `@` form is never produced.
 
 ---
 
