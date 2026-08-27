@@ -306,7 +306,15 @@ We reuse its `package.json` exports map and tsconfig, and nothing else.
 
 **→ Fixtures are recorded from real runs, never hand-written.** The single lesson from PR #2810. Every parser fixture is a captured `--mode json` transcript under `test/fixtures/`, secrets scrubbed. A hand-authored fixture would let us re-invent a CLI that does not exist.
 
-**→ Skills via `--add-dir` + tmpdir.** Option 1 of the skill's ranked list, available because omp has `--add-dir`. Never write into the agent's cwd.
+**→ ⚠ Skills via a `--config` overlay, NOT `--add-dir`.** The earlier draft assumed claude-local's tmpdir + "additional directory" pattern transferred to omp. It does not. Probing omp 17.3.8 directly: a skill placed in an `--add-dir` directory was **never discovered**, while the same skill reached through a `--config` overlay setting `skills.customDirectories` was found and used. The overlay is per-run, writes nothing to the agent's cwd, and writes nothing to omp's global config:
+
+```yaml
+skills:
+  customDirectories:
+    - "/tmp/paperclip-skills-xxxx/skills"
+```
+
+Also learned: omp already discovers Claude, Codex, Pi and Agents user and project skills by default (`skills.enableClaudeUser` and friends all default true), so a Paperclip host sees the operator's personal skills unless scoped. And `--config` applies to runs but not to the `config` subcommand, which makes a naive check look like a false negative.
 
 **→ ✅ Resolved by the Paperclip team: two surfaces, two layers, both shipped.** The earlier draft treated the in-tree and prime-adapter UI contracts as competing. They are not.
 
@@ -448,7 +456,9 @@ PR #2810 passed `` `@${instructionsFilePath}` ``, so agent instructions would ha
 **KILL MUTANTS**: Pin markdown-over-fallback precedence.
 **REFACTOR**: If valuable.
 **Done when**: Commit approved.
-**⚠ Verify first**: that `DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE` exists in `@paperclipai/adapter-utils@2026.817.0`. It was not among the exports confirmed so far.
+**✅ DONE.** `src/server/prompt.ts`, mutation score 100% (29/29).
+
+**⚠ `selectPaperclipTaskMarkdown` has no fallback.** It returns `""` for a structured `paperclipIssue` — it reads only `paperclipTaskMarkdown`. The plan had assumed it handled the precedence; leaning on it would have sent an agent woken with only a structured issue **no task at all**. The fallback and the precedence are built explicitly here.
 
 #### Step 9: Execute an omp run and return an `AdapterExecutionResult`
 
@@ -459,6 +469,11 @@ PR #2810 passed `` `@${instructionsFilePath}` ``, so agent instructions would ha
 **KILL MUTANTS**: Pin resolved-vs-configured model, the non-zero-exit path, and that the retry happens **once** — an infinite retry loop must fail a test.
 **REFACTOR**: If valuable.
 **Done when**: Commit approved.
+**✅ DONE.** `src/server/execute.ts`, mutation score 100% (44/44).
+
+**The stdin hang is narrower than first recorded.** `runChildProcess` sets `stdio: [opts.stdin != null ? "pipe" : "ignore", ...]`, so it already ignores stdin unless a value is passed. The rule is simply never to pass one, and a test asserts the runner is called without a `stdin` key.
+
+Three of the four retry guards had no test distinguishing them until mutation testing: a resumed run that timed out, and a resumed run that succeeded with stale-session text on stderr, would both have been retried.
 
 #### Step 10: Make Paperclip skills discoverable without touching the agent's cwd
 
@@ -469,7 +484,11 @@ PR #2810 passed `` `@${instructionsFilePath}` ``, so agent instructions would ha
 **KILL MUTANTS**: Pin that cleanup runs on the throwing path, not just the happy path.
 **REFACTOR**: If valuable.
 **Done when**: Commit approved.
-**⚠ Verify first**: that omp actually discovers skills in an `--add-dir` directory, and what layout it expects (claude-local uses `.claude/skills/`). If omp does not scan added dirs for skills, fall back to option 2 — its own global skills dir, skipping pre-existing entries.
+**✅ DONE.** Implemented against the probed mechanism, not the assumed one: `--add-dir` does not expose skills, a `--config` overlay does. `src/server/skills.ts`, mutation score 100% (20/20).
+
+**Selection uses `config.paperclipSkillSync.desiredSkills`**, not `config.skills`. `resolvePaperclipDesiredSkillNames` returns `[]` both for "none selected" and "not specified"; `readPaperclipSkillSyncPreference(config).explicit` is what separates them, so an agent with no stated preference correctly receives every skill rather than none.
+
+All five mutation survivors here shared one cause: test skills with `key === runtimeName`, and a temp root that was a string prefix of the skills directory. Identical values hid every mix-up between them.
 
 ---
 
