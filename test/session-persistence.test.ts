@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sessionCodec } from "../src/server/session.js";
+import { canResumeSession, sessionCodec } from "../src/server/session.js";
 
 const A_SESSION_ID = "01a030e2-a211-7000-9964-0903ee42ed0f";
 
@@ -97,5 +97,53 @@ describe("tolerating a stored session written by a different version", () => {
       sessionId: A_SESSION_ID,
       cwd: "/workspace",
     });
+  });
+});
+
+describe("deciding whether an earlier session still applies", () => {
+  it("resumes a session created in the same directory", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: "/workspace/project" };
+
+    expect(canResumeSession(session, "/workspace/project")).toBe(true);
+  });
+
+  it("resumes a session whose recorded directory is written differently", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: "/workspace/./project/" };
+
+    expect(canResumeSession(session, "/workspace/other/../project")).toBe(true);
+  });
+
+  it("refuses a session created in a different project", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: "/workspace/other-project" };
+
+    expect(canResumeSession(session, "/workspace/project")).toBe(false);
+  });
+
+  it("refuses a session from a directory that merely shares a prefix", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: "/workspace/project-two" };
+
+    expect(canResumeSession(session, "/workspace/project")).toBe(false);
+  });
+
+  it("refuses a session created in a directory that contains this one", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: "/workspace" };
+
+    expect(canResumeSession(session, "/workspace/project")).toBe(false);
+  });
+
+  it("refuses a session created in a directory nested inside this one", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: "/workspace/project/packages/core" };
+
+    expect(canResumeSession(session, "/workspace/project")).toBe(false);
+  });
+
+  it("resumes a session that recorded no directory, since there is nothing to contradict", () => {
+    const session = { sessionId: A_SESSION_ID, cwd: null };
+
+    expect(canResumeSession(session, "/workspace/project")).toBe(true);
+  });
+
+  it("starts fresh when there is no session at all", () => {
+    expect(canResumeSession(null, "/workspace/project")).toBe(false);
   });
 });
