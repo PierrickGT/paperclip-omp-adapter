@@ -100,20 +100,26 @@ describe("supplying the agent's standing instructions", () => {
 });
 
 describe("making Paperclip skills reachable", () => {
-  it("adds each skills directory omp should see", () => {
-    const args = buildOmpArgs(anInvocation({ skillsDirs: ["/tmp/paperclip-skills-a", "/tmp/paperclip-skills-b"] }));
+  it("loads each configuration overlay omp should apply", () => {
+    const args = buildOmpArgs(anInvocation({ configOverlays: ["/tmp/skills-a.yml", "/tmp/skills-b.yml"] }));
 
-    expect(args.filter((arg) => arg === "--add-dir")).toHaveLength(2);
-    expect(args).toContain("/tmp/paperclip-skills-a");
-    expect(args).toContain("/tmp/paperclip-skills-b");
+    expect(args.filter((arg) => arg === "--config")).toHaveLength(2);
+    expect(args).toContain("/tmp/skills-a.yml");
+    expect(args).toContain("/tmp/skills-b.yml");
   });
 
-  it("adds nothing when there are no skills to expose", () => {
-    expect(buildOmpArgs(anInvocation())).not.toContain("--add-dir");
+  it("loads nothing when there is no overlay to apply", () => {
+    expect(buildOmpArgs(anInvocation())).not.toContain("--config");
   });
 
-  it("ignores a blank skills directory", () => {
-    expect(buildOmpArgs(anInvocation({ skillsDirs: ["  "] }))).not.toContain("--add-dir");
+  it("ignores a blank overlay path", () => {
+    expect(buildOmpArgs(anInvocation({ configOverlays: ["  "] }))).not.toContain("--config");
+  });
+
+  it("never reaches for --add-dir, which does not load skills", () => {
+    const args = buildOmpArgs(anInvocation({ configOverlays: ["/tmp/skills-a.yml"] }));
+
+    expect(args).not.toContain("--add-dir");
   });
 });
 
@@ -143,7 +149,7 @@ describe("producing a stable command line", () => {
         thinking: "high",
         resumeSessionId: "01a03",
         instructionsFilePath: "/workspace/AGENT.md",
-        skillsDirs: ["/tmp/skills"],
+        configOverlays: ["/tmp/skills.yml"],
         extraArgs: ["--no-lsp"],
       }),
     );
@@ -165,8 +171,8 @@ describe("producing a stable command line", () => {
       "high",
       "--append-system-prompt",
       "/workspace/AGENT.md",
-      "--add-dir",
-      "/tmp/skills",
+      "--config",
+      "/tmp/skills.yml",
       "--no-lsp",
       "Continue your Paperclip work.",
     ]);

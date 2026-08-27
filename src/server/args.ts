@@ -27,8 +27,16 @@ export type OmpInvocation = {
   readonly resumeSessionId?: string | undefined;
   /** Absolute path to a markdown file appended to omp's system prompt. */
   readonly instructionsFilePath?: string | undefined;
-  /** Directories omp should treat as workspace, used to expose Paperclip skills. */
-  readonly skillsDirs?: readonly string[] | undefined;
+  /**
+   * Absolute paths to `config.yml`-shaped overlays applied for this run only.
+   *
+   * This is how Paperclip skills reach omp: an overlay sets
+   * `skills.customDirectories` to a temporary directory. `--add-dir` does *not*
+   * work for this — a probe against omp 17.3.8 confirmed a skill placed in an
+   * added directory is never discovered, while the same skill reached through an
+   * overlay was found and used.
+   */
+  readonly configOverlays?: readonly string[] | undefined;
   readonly extraArgs?: readonly string[] | undefined;
 };
 
@@ -55,7 +63,7 @@ export const buildOmpArgs = (invocation: OmpInvocation): readonly string[] => [
   ...flag("--model", invocation.model),
   ...flag("--thinking", invocation.thinking),
   ...flag("--append-system-prompt", invocation.instructionsFilePath),
-  ...(invocation.skillsDirs ?? []).flatMap((dir) => flag("--add-dir", dir)),
+  ...(invocation.configOverlays ?? []).flatMap((overlay) => flag("--config", overlay)),
   ...(invocation.extraArgs ?? []),
   invocation.prompt,
 ];
