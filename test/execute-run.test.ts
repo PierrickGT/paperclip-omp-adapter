@@ -220,6 +220,27 @@ describe("starting the process", () => {
     expect(runner.runs[0]?.opts.graceSec).toBe(15);
   });
 
+  it("passes the operator's extra arguments through to omp", async () => {
+    const runner = aRunner();
+    const context = aContext({
+      config: { cwd: "/workspace/project", extraArgs: ["--no-lsp", "--max-time", "10m"] },
+    });
+
+    await execute(context, deps(runner));
+
+    expect(runner.runs[0]?.args).toContain("--no-lsp");
+    expect(runner.runs[0]?.args).toContain("10m");
+  });
+
+  it("ignores extra arguments that are not a list of strings", async () => {
+    const runner = aRunner();
+    const context = aContext({ config: { cwd: "/workspace/project", extraArgs: "--no-lsp" } });
+
+    await execute(context, deps(runner));
+
+    expect(runner.runs[0]?.args).not.toContain("--no-lsp");
+  });
+
   it("applies the configured time limits", async () => {
     const runner = aRunner();
     const context = aContext({ config: { cwd: "/workspace/project", timeoutSec: 60, graceSec: 5 } });

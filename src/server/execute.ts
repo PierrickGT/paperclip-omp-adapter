@@ -95,6 +95,9 @@ const asTrimmed = (value: unknown): string | null => {
 const asPositiveNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 
+const asStringList = (value: unknown): readonly string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 
@@ -213,6 +216,7 @@ export const execute = async (ctx: ExecutionContext, deps: ExecuteDeps): Promise
       resumeSessionId: session?.sessionId,
       instructionsFilePath: asTrimmed(ctx.config["instructionsFilePath"]) ?? undefined,
       configOverlays: skills.configOverlays,
+      extraArgs: asStringList(ctx.config["extraArgs"]),
     });
 
     await ctx.onMeta?.({
