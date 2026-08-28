@@ -7,11 +7,10 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       '@paperclipai/adapter-utils':
         specifier: ^2026.817.0
         version: 2026.817.0
-    devDependencies:
       '@types/node':
         specifier: ^24.6.0
         version: 24.13.3
