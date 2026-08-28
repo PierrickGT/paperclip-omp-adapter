@@ -1,7 +1,7 @@
 # Plan: `omp` — External Paperclip Adapter for omp
 
 **Branch**: `feat/omp-adapter`
-**Status**: Active
+**Status**: All 16 steps complete. Not yet validated inside a live Paperclip instance.
 **Created**: 2026-08-23
 **Last revised**: 2026-08-23 — reconciled against the authoritative `create-agent-adapter` skill
 
@@ -565,6 +565,13 @@ A wiring test runs `createServerAdapter().execute()` against `node` as the comma
 **MUTATE**: N/A — integration test.
 **REFACTOR**: If valuable.
 **Done when**: Live test passes locally, is skipped by default, commit approved.
+**✅ DONE — all five live tests pass against omp 17.3.8**, in 29 seconds. This is the end-to-end proof that the assumptions underneath every faked test actually hold:
+
+- omp runs, answers, and reports usage, cost, provider and the resolved model.
+- A second heartbeat resumes the first session and recalls a word from it.
+- A run handed a session omp has dropped retries from scratch, succeeds, and returns `clearSession: true`.
+- Nothing of the adapter's own is left in the agent's working directory.
+- `testEnvironment` finds omp on the host and reports its version.
 
 ---
 
