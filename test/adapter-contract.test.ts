@@ -40,6 +40,18 @@ describe("the server adapter Paperclip builds", () => {
     expect(createServerAdapter().supportsLocalAgentJwt).toBe(true);
   });
 
+  it("asks Paperclip to keep managing the agent's instructions bundle", () => {
+    // Left undeclared, the host falls back to an allow-list of built-in adapter
+    // types that cannot contain "omp", silently stops regenerating AGENTS.md and
+    // resolves the instructions path key to null — so the `instructionsFilePath`
+    // setting below would never be populated for a managed agent.
+    expect(createServerAdapter().supportsInstructionsBundle).toBe(true);
+  });
+
+  it("names the setting Paperclip should write the bundle path into", () => {
+    expect(createServerAdapter().instructionsPathKey).toBe("instructionsFilePath");
+  });
+
   it("carries the configuration documentation through to the host", () => {
     expect(createServerAdapter().agentConfigurationDoc).toBe(agentConfigurationDoc);
   });

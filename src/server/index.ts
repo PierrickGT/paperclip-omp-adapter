@@ -105,6 +105,12 @@ export const createServerAdapter = () => ({
   getConfigSchema,
   supportsLocalAgentJwt: true,
 
+  // Undeclared, the host falls back to an allow-list of built-in adapter types,
+  // stops regenerating the agent's AGENTS.md and resolves the instructions path
+  // key to null — leaving `instructionsFilePath` empty for every managed agent.
+  supportsInstructionsBundle: true,
+  instructionsPathKey: "instructionsFilePath" as const,
+
   execute: (ctx: ExecutionContext): Promise<ExecutionResult> => runOmp(ctx, executeDeps),
 
   testEnvironment: (ctx: {
