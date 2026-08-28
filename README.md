@@ -8,27 +8,65 @@ agent runtime, with session resume across heartbeats and accurate usage and cost
 
 ## Status
 
-Alpha. Every module is built and tested, but the adapter has not yet been run inside a live
-Paperclip instance. Paperclip's own external-adapter runtime is also flagged alpha.
+Alpha. Every module is built and tested. The adapter installs, loads, and passes its environment
+test inside a live Paperclip instance (2026.817.0), but no agent run has executed through it yet.
+Paperclip's own external-adapter runtime is also flagged alpha.
 
-Verified against **omp 17.3.8**.
+Verified against **omp 17.3.8** and **17.4.0**; the environment test accepts any 17.x.
 
 ## Install
 
-Install from the Paperclip Board UI, under Settings → Adapters, or:
+This package is not published to npm, so install it from a local checkout:
 
 ```
-POST /api/adapters/install   { "package": "paperclip-omp-adapter" }
+git clone https://github.com/PierrickGT/paperclip-omp-adapter
+cd paperclip-omp-adapter && pnpm install && pnpm build
+
+paperclipai adapter install --payload-json \
+  '{"packageName":"/absolute/path/to/paperclip-omp-adapter","isLocalPath":true}'
 ```
+
+The install route's field is `packageName`, not `package`, and `isLocalPath` is what makes it read
+your checkout instead of the npm registry. The Paperclip Board UI's Settings → Adapters form does
+the same thing.
 
 Then create an agent with adapter type `omp`. Use **Test environment** in the agent form to check
-that omp is installed and reachable before the first run.
+that omp is installed and reachable before the first run, or from the CLI:
+
+```
+paperclipai adapter test-environment omp -C <companyId> \
+  --payload-json '{"adapterConfig":{"command":"/absolute/path/to/omp"}}'
+```
+
+The config goes under `adapterConfig`, and `-C` is required.
+
+### omp must be reachable from the *server's* PATH
+
+Paperclip resolves `command` against the environment of the long-running server process, which is
+usually not the PATH of the shell you installed omp from. If omp is a JS entrypoint with a
+`#!/usr/bin/env bun` (or node) shebang, that interpreter has to be reachable too, or every
+invocation exits 127 — which surfaces only as `Could not read the omp version`, because the
+`omp_command` check passes on a bare stat.
+
+Check what the server actually has:
+
+```
+tr '\0' '\n' < /proc/$(pgrep -f 'paperclipai.*run')/environ | grep ^PATH=
+```
+
+The reliable fix is a wrapper on an absolute path, with `command` pointed at it:
+
+```sh
+#!/bin/sh
+PATH="$HOME/.bun/bin:$PATH"; export PATH
+exec "$HOME/.local/share/pnpm/omp" "$@"
+```
 
 ## Configuration
 
 | Setting | Purpose |
 |---|---|
-| `command` | omp executable. Defaults to `omp` on the server's PATH. |
+| `command` | omp executable. Defaults to `omp` on the server's PATH — usually set this to an absolute path, see above. |
 | `cwd` | Absolute working directory. Ignored when Paperclip assigns a workspace. Created if missing. |
 | `model` | Passed whole, so `anthropic/claude-opus-5` and `opus` both work. `omp models` lists them. |
 | `thinking` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `auto`. |
@@ -89,6 +127,25 @@ pnpm build
 The decision-making modules take their filesystem and process work as injected dependencies, so unit
 tests spawn nothing. `src/server/runtime.ts` holds the real bindings and is tested against real
 directories and a real binary.
+
+### `@paperclipai/adapter-utils` must not be duplicated
+
+`adapter-utils` keeps `runningProcesses` in a module-scope Map, and Paperclip's heartbeat reads that
+Map to cancel and reap runs. An adapter that loads a *second* copy registers its child processes
+somewhere the server never looks: runs start, then cannot be stopped and stale-run detection misses
+them. Nothing throws, so this is worth preventing rather than debugging.
+
+It is therefore a **peer** dependency. It is also a devDependency, because the build and tests need
+it — and that installed copy is what Node would otherwise resolve. `scripts/link-adapter-utils.mjs`
+runs on `postinstall` and repoints `node_modules/@paperclipai/adapter-utils` at whatever copy the
+host Paperclip CLI is running. It no-ops when no Paperclip install is found, so CI and fresh clones
+are unaffected. Override the search root with `PAPERCLIP_HOME`.
+
+Verify with:
+
+```
+realpath node_modules/@paperclipai/adapter-utils/dist/server-utils.js
+```
 
 Test fixtures under `test/fixtures/` are recorded from real omp runs and must never be hand-written.
 See `test/fixtures/README.md` for why.
