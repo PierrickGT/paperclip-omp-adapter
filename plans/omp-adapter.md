@@ -568,7 +568,13 @@ All five mutation survivors here shared one cause: test skills with `key === run
 
 **→ Does omp discover skills in an `--add-dir` directory, and in what layout?** The whole of Step 10 rests on this. Claude Code expects `.claude/skills/`; omp's equivalent is unprobed. **Check before Step 10.**
 
-**→ How does omp authenticate in an unattended run?** omp reads provider keys from env (`ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, others) and ships `omp auth-broker` (a credential vault) and `omp auth-gateway`. Passing keys through adapter `config.env` is the simple path and aligns with the skill's "secrets via environment, never prompts" rule; the broker may be correct for a multi-agent host. **Decide before PR 3.** Simple path assumed.
+**→ ✅ Closed: authentication needs no adapter change either way.** omp reads provider keys from env, and also ships `omp auth-broker` — a credential vault served over HTTP that a run reaches through exactly two variables, `OMP_AUTH_BROKER_URL` and a bearer token (`auth.broker.url` / `auth.broker.token`). Both routes travel through the same `config.env` mechanism already built and tested, so this was never a fork in the road.
+
+Default stays `config.env`: it matches the skill's "secrets through environment, never prompts" rule and needs no extra process.
+
+**The broker is the only route to subscription-plan auth**, which `config.env` cannot express — there is no API key to paste for a Claude Pro or ChatGPT Plus plan. `omp auth-broker list` shows OAuth support for anthropic, openai-codex, zai, github-copilot, cursor, google-gemini-cli, xai, gitlab-duo, and about ten more. It also centralises rotation, so agents hold a broker bearer rather than a provider key each.
+
+Its cost is a long-running `omp auth-broker serve` process to supervise alongside Paperclip. `agentConfigurationDoc` (Step 14) must document both routes and say plainly that subscription plans require the broker.
 
 **→ Should `--profile` isolate each Paperclip agent?** `omp --profile <name>` gives isolated auth, sessions, settings, and caches — a stronger per-agent boundary than `--session-dir` alone. Evaluate during PR 2; not assumed in the current steps.
 
