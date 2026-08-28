@@ -538,6 +538,11 @@ All five mutation survivors here shared one cause: test skills with `key === run
 **KILL MUTANTS**: Pin the `type` string.
 **REFACTOR**: If valuable.
 **Done when**: Commit approved.
+**✅ DONE.** `src/server/index.ts` holds metadata, `agentConfigurationDoc` and the factory; `src/server/runtime.ts` holds the real filesystem and child-process bindings every other module takes injected.
+
+`runtime.ts` is tested against real directories and a real binary, with `node` standing in for `omp`. Mutation score 94% (16/17); the survivor drops empty `PATH` entries, which no test can distinguish without placing an executable in the test process's own directory — documented in the source as hardening rather than tested behaviour.
+
+A wiring test runs `createServerAdapter().execute()` against `node` as the command, which exercises the process runner, the directory creation and the skills staging together without needing omp installed.
 
 #### Step 15: Package for the Paperclip plugin loader
 
@@ -546,6 +551,7 @@ All five mutation survivors here shared one cause: test skills with `key === run
 **GREEN**: Configure `package.json` and `tsconfig.json`.
 **MUTATE / REFACTOR**: N/A — packaging config.
 **Done when**: Commit approved.
+**✅ DONE.** `test/package-is-installable.test.ts` builds, then checks the manifest as the loader reads it: the two export entries resolve to files the build emits, `npm pack --dry-run` ships `dist/` and no `src/` or `test/`, every declared dependency is actually imported by the source, and the README states plainly that this is a community package.
 
 ---
 
