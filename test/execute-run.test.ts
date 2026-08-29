@@ -637,3 +637,57 @@ describe("giving the run access to Paperclip's skills", () => {
     expect(runner.runs).toHaveLength(2);
   });
 });
+
+describe("cleaning up processes the kill did not reach", () => {
+  it("reaps survivors after a run that timed out", async () => {
+    // adapter-utils signals the process group, which misses anything that
+    // called setsid. Those survivors are the ones that leaked 17 GB.
+    const reaped: string[] = [];
+    const runner = aRunner([anOutcome({ timedOut: true, exitCode: null, signal: "SIGTERM" })]);
+
+    await execute(
+      aContext(),
+      deps(runner, [], {
+        reapSurvivors: async (runId) => {
+          reaped.push(runId);
+          return [];
+        },
+      }),
+    );
+
+    expect(reaped).toEqual(["run-42"]);
+  });
+
+  it("reaps survivors after a run that exited normally", async () => {
+    // A clean exit is no guarantee: a detached grandchild outlives it too.
+    const reaped: string[] = [];
+    const runner = aRunner();
+
+    await execute(
+      aContext(),
+      deps(runner, [], {
+        reapSurvivors: async (runId) => {
+          reaped.push(runId);
+          return [];
+        },
+      }),
+    );
+
+    expect(reaped).toEqual(["run-42"]);
+  });
+
+  it("still returns the run's result when reaping throws", async () => {
+    const runner = aRunner();
+
+    const result = await execute(
+      aContext(),
+      deps(runner, [], {
+        reapSurvivors: async () => {
+          throw new Error("procfs unavailable");
+        },
+      }),
+    );
+
+    expect(result.exitCode).toBe(0);
+  });
+})

@@ -57,6 +57,11 @@ export type ExecuteDeps = {
     config: Record<string, unknown>,
     onWarn: (message: string) => Promise<void>,
   ) => Promise<PreparedSkills>;
+  /**
+   * Kills descendants the process-group signal could not reach. Optional: an
+   * adapter running where the process table is unreadable simply goes without.
+   */
+  readonly reapSurvivors?: (runId: string) => Promise<readonly number[]>;
 };
 
 export type ExecutionContext = {
@@ -249,6 +254,29 @@ export const execute = async (ctx: ExecutionContext, deps: ExecuteDeps): Promise
     const retry = await attempt(null);
     return toResult(retry, parseOmpRun(retry.stdout), cwd, true);
   } finally {
+    // Order matters: reap before removing the staged skills, so a survivor
+    // still holding that directory open is gone before it is unlinked.
+    await reap(ctx, deps);
     await skills.cleanup();
+  }
+};
+
+/**
+ * A leaked process is worse than a failed cleanup, but a failed cleanup must
+ * never fail the run: the result is already computed by the time this runs.
+ */
+const reap = async (ctx: ExecutionContext, deps: ExecuteDeps): Promise<void> => {
+  if (!deps.reapSurvivors) return;
+
+  try {
+    const reaped = await deps.reapSurvivors(ctx.runId);
+    if (reaped.length > 0) {
+      await ctx.onLog(
+        "stderr",
+        `[paperclip] reaped ${reaped.length} process(es) that outlived the run: ${reaped.join(", ")}\n`,
+      );
+    }
+  } catch {
+    // No backstop this time. The run's own result stands.
   }
 };

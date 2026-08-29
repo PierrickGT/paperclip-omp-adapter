@@ -17,7 +17,16 @@ import { fileURLToPath } from "node:url";
 
 import { getConfigSchema } from "./config-schema.js";
 import { execute as runOmp, type ExecuteDeps, type ExecutionContext, type ExecutionResult } from "./execute.js";
-import { isDirectory, readCommandVersion, resolveCommandPath, stagingDeps } from "./runtime.js";
+import { reapRunSurvivors } from "./reap.js";
+import {
+  isDirectory,
+  isProcessAlive,
+  listRunProcesses,
+  readCommandVersion,
+  resolveCommandPath,
+  signalProcess,
+  stagingDeps,
+} from "./runtime.js";
 import { sessionCodec } from "./session.js";
 import { prepareSkills, type SkillEntry } from "./skills.js";
 import { testEnvironment as checkEnvironment, type EnvironmentTestResult } from "./test-environment.js";
@@ -94,6 +103,14 @@ const executeDeps: ExecuteDeps = {
 
   prepareSkills: (config, onWarn) =>
     prepareSkills(config, { ...stagingDeps, listSkills: () => toSkillEntries(config) }, onWarn),
+
+  reapSurvivors: (runId) =>
+    reapRunSurvivors(runId, {
+      listProcesses: listRunProcesses,
+      signal: signalProcess,
+      isAlive: isProcessAlive,
+      selfPid: process.pid,
+    }),
 };
 
 export const createServerAdapter = () => ({
