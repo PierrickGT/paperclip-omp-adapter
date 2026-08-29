@@ -62,6 +62,11 @@ export type ExecuteDeps = {
    * adapter running where the process table is unreadable simply goes without.
    */
   readonly reapSurvivors?: (runId: string) => Promise<readonly number[]>;
+  /**
+   * Refuses a second concurrent run for one agent. Optional: without it the
+   * adapter behaves as before and relies on the scheduler not to stack runs.
+   */
+  readonly withRunLock?: <T>(agentId: string, work: () => Promise<T>) => Promise<T>;
 };
 
 export type ExecutionContext = {
@@ -186,6 +191,13 @@ const toResult = (
 };
 
 export const execute = async (ctx: ExecutionContext, deps: ExecuteDeps): Promise<ExecutionResult> => {
+  // The lock wraps everything, including skills staging: a refused run must not
+  // create a temporary directory it will never clean up.
+  if (deps.withRunLock) {
+    const { withRunLock, ...rest } = deps;
+    return withRunLock(ctx.agent.id, () => execute(ctx, rest));
+  }
+
   const command = asTrimmed(ctx.config["command"]) ?? DEFAULT_COMMAND;
   const cwd = resolveCwd(ctx);
   const sessionDir = resolveSessionDir(ctx);

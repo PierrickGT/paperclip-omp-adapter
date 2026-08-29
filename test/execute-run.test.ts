@@ -691,3 +691,41 @@ describe("cleaning up processes the kill did not reach", () => {
     expect(result.exitCode).toBe(0);
   });
 })
+
+describe("refusing to stack runs for one agent", () => {
+  it("passes the agent id to the lock and runs the work inside it", async () => {
+    const locked: string[] = [];
+    const runner = aRunner();
+
+    const result = await execute(
+      aContext(),
+      deps(runner, [], {
+        withRunLock: async (agentId, work) => {
+          locked.push(agentId);
+          return work();
+        },
+      }),
+    );
+
+    expect(locked).toEqual(["agent-1"]);
+    expect(result.exitCode).toBe(0);
+    expect(runner.runs).toHaveLength(1);
+  });
+
+  it("does not spawn omp when the lock refuses the run", async () => {
+    const runner = aRunner();
+
+    await expect(
+      execute(
+        aContext(),
+        deps(runner, [], {
+          withRunLock: async () => {
+            throw new Error("already has an omp run in flight");
+          },
+        }),
+      ),
+    ).rejects.toThrow("already has an omp run in flight");
+
+    expect(runner.runs).toHaveLength(0);
+  });
+})

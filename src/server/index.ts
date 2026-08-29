@@ -18,12 +18,14 @@ import { fileURLToPath } from "node:url";
 import { getConfigSchema } from "./config-schema.js";
 import { execute as runOmp, type ExecuteDeps, type ExecutionContext, type ExecutionResult } from "./execute.js";
 import { reapRunSurvivors } from "./reap.js";
+import { withRunLock } from "./run-lock.js";
 import {
   isDirectory,
   isProcessAlive,
   listRunProcesses,
   readCommandVersion,
   resolveCommandPath,
+  runLockDeps,
   signalProcess,
   stagingDeps,
 } from "./runtime.js";
@@ -103,6 +105,8 @@ const executeDeps: ExecuteDeps = {
 
   prepareSkills: (config, onWarn) =>
     prepareSkills(config, { ...stagingDeps, listSkills: () => toSkillEntries(config) }, onWarn),
+
+  withRunLock: (agentId, work) => withRunLock(agentId, runLockDeps, work),
 
   reapSurvivors: (runId) =>
     reapRunSurvivors(runId, {

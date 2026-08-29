@@ -162,3 +162,47 @@ export const isProcessAlive = async (pid: number): Promise<boolean> => {
     return false;
   }
 };
+
+const LOCK_DIR = join(tmpdir(), "paperclip-omp-locks");
+
+const lockPathFor = (agentId: string): string => join(LOCK_DIR, `${agentId}.lock`);
+
+/**
+ * An atomic per-agent lock built on `O_EXCL`, which is atomic on every
+ * filesystem this adapter runs on.
+ *
+ * A lock outlives the process that took it if Paperclip is killed mid-run, so a
+ * lock naming a pid that no longer exists is stale and gets stolen. Without
+ * that, one crash would block an agent forever.
+ */
+export const runLockDeps = {
+  acquire: async (agentId: string): Promise<boolean> => {
+    await mkdir(LOCK_DIR, { recursive: true });
+    const path = lockPathFor(agentId);
+
+    try {
+      await writeFile(path, String(process.pid), { flag: "wx" });
+      return true;
+    } catch {
+      return stealIfStale(path);
+    }
+  },
+
+  release: async (agentId: string): Promise<void> => {
+    await rm(lockPathFor(agentId), { force: true });
+  },
+};
+
+const stealIfStale = async (path: string): Promise<boolean> => {
+  try {
+    const holder = Number((await readFile(path, "utf8")).trim());
+    if (Number.isFinite(holder) && holder > 0 && (await isProcessAlive(holder))) return false;
+
+    await rm(path, { force: true });
+    await writeFile(path, String(process.pid), { flag: "wx" });
+    return true;
+  } catch {
+    // Lost the race to another acquirer, or the lock is unreadable.
+    return false;
+  }
+};
